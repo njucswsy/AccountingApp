@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Money Manager - 小账精</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- 图标和图表库 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
+  <style>
+    /* 全局样式变量 */
+    :root{
+      --primary:#1abc9c; --primary-light:#a2e1d4;
+      --text:#1f2937; --sub:#6b7280; --line:#e5e7eb;
+      --income:#10b981; --expense:#ef4444;
+      --radius-lg:22px; --radius:14px;
+      --shadow:0 10px 26px rgba(0,0,0,.10);
+    }
+    *{box-sizing:border-box;}
+    html,body{height:100%; margin:0;}
+    body{
+      background:linear-gradient(135deg,#f4f9fd 0%,#e8f5fb 100%);
+      color:var(--text);
+      font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      display:flex; justify-content:center; align-items:stretch;
+      overflow:hidden;
+    }
+    .app-shell{
+      width:100%; max-width:480px; height:100vh;
+      background:#fff; border-radius:26px; box-shadow:var(--shadow);
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    .header{
+      padding:14px 18px; display:flex; justify-content:space-between; align-items:center;
+      background:rgba(255,255,255,.96); backdrop-filter:blur(8px);
+      border-bottom:1px solid var(--line); z-index:10;
+    }
+    .header-main{display:flex; flex-direction:column;}
+    .header-title{font-size:20px; font-weight:800;}
+    .header-subtitle{font-size:13px; color:var(--sub)}
+    .icon-button{width:36px;height:36px;border-radius:999px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;background:#fff;cursor:pointer}
+    .content{flex:1; padding:16px 18px 90px; overflow-y:auto;}
+
+    /* 页面样式 */
+    .page{display:none; flex-direction:column; gap:12px; min-height:100%}
+    .page.active{display:flex}
+
+    .balance-card{
+      background:linear-gradient(135deg,#1abc9c 0%,#16a085 60%,#149174 100%);
+      color:#fff; border-radius:22px; padding:18px; box-shadow:var(--shadow);
+    }
+    .balance-amount{font-size:30px; font-weight:800; margin:6px 0 10px}
+    .balance-meta{display:flex; gap:18px; font-size:14px}
+
+    .budget-card{background:#fff;border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow);cursor:pointer}
+    .budget-header{display:flex;justify-content:space-between;align-items:center}
+    .progress-bar{height:8px;border-radius:999px;background:#edf2f7;overflow:hidden;margin-top:8px}
+    .progress-fill{height:100%;width:0;background:linear-gradient(90deg,#10b981,#f59e0b);transition:width .25s}
+    .progress-text{font-size:13px;color:var(--sub);margin-top:4px}
+
+    .section-title{font-size:15px;font-weight:700;margin-top:4px}
+
+    .transaction-list{display:flex;flex-direction:column;gap:10px}
+    .transaction-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:var(--radius);padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,.05)}
+    .transaction-category{width:34px;height:34px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;color:var(--primary)}
+
+    .btn{padding:12px 16px;border:none;border-radius:999px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
+
+    /* 记账页 */
+    .toggle-switch{background:#edf2f7;border-radius:999px;padding:4px;display:inline-flex;gap:6px}
+    .switch-option{padding:5px 12px;border-radius:999px;font-size:13px;color:var(--sub);cursor:pointer}
+    .switch-option.active{background:#fff;color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+    .amount-input{width:100%;font-size:32px;font-weight:800;border:none;border-bottom:1px solid var(--line);padding:6px 0 12px;outline:none}
+    .form-group{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+    .form-label{font-size:13px;color:var(--sub)}
+    .text-input,.search-input,.date-input{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;outline:none;background:#fff}
+    .text-input:focus,.search-input:focus,.date-input:focus{border-color:var(--primary)}
+    .category-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+    .category-item{min-width:84px;padding:8px 10px;border-radius:12px;background:#f7fafb;cursor:pointer}
+    .category-item.active{background:#e0fbf6;border:1px solid #17a98d}
+    .category-actions{display:flex;gap:10px;margin-top:10px}
+
+    /* 统计页 */
+    .summary-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .summary-card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,.05);cursor:pointer}
+    .summary-label{font-size:13px;color:var(--sub)}
+    .summary-value{font-size:18px;font-weight:800;margin-top:2px}
+    #main-chart{width:100%;height:260px;background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:10px}
+
+    /* 用户资料区域 */
+    .user-header{
+      background:linear-gradient(135deg,#1abc9c 0%,#16a085 100%);
+      color:#fff;border-radius:18px;padding:20px;margin-bottom:12px;box-shadow:var(--shadow);
+    }
+    .user-avatar{font-size:48px;margin-bottom:8px}
+    .user-name{font-size:20px;font-weight:800;margin-bottom:2px}
+    .user-status{font-size:13px;opacity:0.9}
+    .user-info-item{background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    .user-info-label{font-size:13px;color:var(--sub);margin-bottom:4px}
+    .user-info-value{font-size:14px;font-weight:600;color:var(--text)}
+    .user-info-edit{color:var(--primary);cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+
+    /* 设置区域 - 改为列表风格 */
+    .settings-group{background:#fff;border-radius:12px;padding:0;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.04);overflow:hidden}
+    .settings-group-title{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:0;padding:12px 14px 8px 14px;text-transform:uppercase;letter-spacing:0.5px}
+    .settings-item{display:flex;flex-direction:row;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid var(--line);gap:12px}
+    .settings-item:last-child{border-bottom:none}
+    .settings-label{font-size:14px;color:var(--text);font-weight:500;flex:1;display:flex;justify-content:space-between;align-items:center}
+    .settings-value{font-size:12px;color:var(--sub)}
+    .toggle-checkbox{width:48px;height:28px;background:#ccc;border-radius:14px;cursor:pointer;position:relative;transition:background 0.3s;flex-shrink:0}
+    .toggle-checkbox.active{background:var(--primary)}
+    .toggle-checkbox::after{content:'';position:absolute;width:24px;height:24px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left 0.3s;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+    .toggle-checkbox.active::after{left:22px}
+
+    /* 登录表单 */
+    .login-card{background:#fff;border-radius:18px;padding:24px;box-shadow:var(--shadow);text-align:center}
+    .login-title{font-size:22px;font-weight:800;margin-bottom:12px}
+    .login-subtitle{font-size:13px;color:var(--sub);margin-bottom:20px}
+    .login-input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;font-size:14px;outline:none}
+    .login-input:focus{border-color:var(--primary)}
+    .login-buttons{display:flex;gap:10px;margin-top:16px}
+    .login-buttons button{flex:1;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer}
+
+    /* 底部导航 */
+    .bottom-nav{position:absolute;left:0;right:0;bottom:0;height:74px;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:8px 14px;z-index:20}
+    .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--sub);cursor:pointer;font-size:13px}
+    .nav-item i{font-size:20px}
+    .nav-item.active{color:var(--primary)}
+    .nav-item.active::after{content:"";width:6px;height:6px;border-radius:999px;background:var(--primary)}
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 顶部 -->
+    <div class="header">
+      <div class="header-main">
+        <div class="header-title" id="header-title">首页</div>
+        <div class="header-subtitle" id="header-subtitle">欢迎使用小账精</div>
+      </div>
+      <button class="icon-button" id="header-add-btn"><i class="fas fa-pen"></i></button>
+    </div>
+
+    <!-- 可滚动内容 -->
+    <div class="content">
+      <!-- 首页 -->
+      <div class="page active" data-page="home">
+        <div class="balance-card">
+          <div style="font-size:13px;opacity:.95;">本月结余</div>
+          <div class="balance-amount" id="home-balance">¥0.00</div>
+          <div class="balance-meta">
+            <div><div>收入</div><div id="home-income" style="font-weight:700">¥0.00</div></div>
+            <div><div>支出</div><div id="home-expense" style="font-weight:700">¥0.00</div></div>
+          </div>
+        </div>
+
+        <!-- 首页预算 -->
+        <div class="budget-card" id="home-budget-card">
+          <div class="budget-header">
+            <div style="font-weight:700">预算管理</div>
+            <div style="color:var(--sub);font-size:13px" id="home-budget-brief">0 / 0 (0%)</div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="home-budget-progress"></div></div>
+          <div class="progress-text" id="home-budget-percent">已用 0%</div>
+        </div>
+
+        <div class="section-title">最近记录</div>
+        <div class="transaction-list" id="home-recent-list"></div>
+      </div>
+
+      <!-- 记账 -->
+      <div class="page" data-page="record">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="section-title">记一笔</div>
+          <div class="toggle-switch" id="record-type">
+            <div class="switch-option active" data-type="expense">支出</div>
+            <div class="switch-option" data-type="income">收入</div>
+          </div>
+        </div>
+
+        <input type="number" class="amount-input" id="record-amount" placeholder="0.00" />
+        <!-- 日期选择 -->
+        <div class="form-group">
+          <div class="form-label">日期</div>
+          <input type="date" class="date-input" id="record-date" />
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">分类</div>
+          <div class="category-grid" id="record-category-grid"></div>
+          <div class="category-actions">
+            <button class="btn" id="record-manage-btn">分类管理</button>
+            <button class="btn" id="record-clear-cat-btn" style="background:#9ca3af">清除选择</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">备注</div>
+          <input type="text" class="text-input" id="record-note" placeholder="如：午餐、地铁、奶茶…" />
+        </div>
+        <div class="form-group">
+          <div class="form-label">商家/场所</div>
+          <input type="text" class="text-input" id="record-store" placeholder="如：星巴克、盒马、美团…" />
+        </div>
+        <div style="margin-top:14px"><button class="btn" id="record-save-btn" style="width:100%">保存记录</button></div>
+      </div>
+
+      <!-- 统计 -->
+      <div class="page" data-page="stats">
+        <!-- 时间范围选择 -->
+        <div class="form-group">
+          <div class="form-label">统计时间范围</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" data-period="day" style="flex:1;min-width:60px;font-size:13px;padding:8px">今天</button>
+            <button class="btn" data-period="week" style="flex:1;min-width:60px;font-size:13px;padding:8px">本周</button>
+            <button class="btn" data-period="month" style="flex:1;min-width:60px;font-size:13px;padding:8px;background:var(--primary)">本月</button>
+            <button class="btn" data-period="year" style="flex:1;min-width:60px;font-size:13px;padding:8px">本年</button>
+            <button class="btn" data-period="custom" style="flex:1;min-width:60px;font-size:13px;padding:8px">自定义</button>
+          </div>
+          <div id="custom-date-range" style="display:none;margin-top:10px;gap:8px">
+            <input type="date" class="date-input" id="stats-start-date" style="flex:1" />
+            <span style="margin:0 8px">至</span>
+            <input type="date" class="date-input" id="stats-end-date" style="flex:1" />
+            <button class="btn" id="stats-apply-custom" style="margin-top:8px;width:100%">应用</button>
+          </div>
+        </div>
+
+        <!-- 收支统计卡片 -->
+        <div class="summary-row">
+          <div class="summary-card" id="stats-expense-card">
+            <div class="summary-label">总支出</div>
+            <div class="summary-value" id="stats-expense">¥0.00</div>
+          </div>
+          <div class="summary-card" id="stats-income-card">
+            <div class="summary-label">总收入</div>
+            <div class="summary-value" id="stats-income">¥0.00</div>
+          </div>
+        </div>
+
+        <div class="section-title">收支趋势</div>
+        <div id="trend-chart" style="width:100%;height:200px;background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:10px;margin-bottom:12px"></div>
+
+        <div class="section-title">分类分布</div>
+        <div id="main-chart"></div>
+
+        <!-- 消费分析按钮 -->
+        <button class="btn" id="open-insights">消费分析</button>
+      </div>
+
+      <!-- 消费分析页面 -->
+      <div class="page" data-page="insights">
+        <div class="section-title">消费分析</div>
+        <div id="insights-text" style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,.06);font-size:15px;color:var(--sub)">
+          正在生成…
+        </div>
+        <div style="margin-top:14px"><button class="btn" id="insights-back">返回统计</button></div>
+      </div>
+
+      <!-- 搜索 -->
+      <div class="page" data-page="search">
+        <div class="form-group">
+          <div class="form-label">搜索条件</div>
+          <input type="text" class="search-input" id="search-keyword" placeholder="关键字（分类、商家、备注）" />
+        </div>
+        <div class="form-group">
+          <div class="form-label">分类</div>
+          <select class="text-input" id="search-category" style="padding:10px 12px">
+            <option value="">全部</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-label">金额范围</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" class="text-input" id="search-amount-min" placeholder="最小金额" style="flex:1" />
+            <span>至</span>
+            <input type="number" class="text-input" id="search-amount-max" placeholder="最大金额" style="flex:1" />
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">日期范围</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="date" class="date-input" id="search-start-date" style="flex:1" />
+            <span>至</span>
+            <input type="date" class="date-input" id="search-end-date" style="flex:1" />
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <button class="btn" id="search-btn" style="flex:1">搜索</button>
+          <button class="btn" id="search-reset-btn" style="flex:1;background:#9ca3af">重置</button>
+        </div>
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="form-label">搜索历史</div>
+            <button class="btn" id="search-clear-history" style="padding:6px 12px;font-size:12px;background:#ef4444">清空历史</button>
+          </div>
+          <div id="search-history" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div style="font-size:13px;color:var(--sub)" id="search-summary">共 0 条记录</div>
+        <div class="transaction-list" id="search-results"></div>
+      </div>
+
+      <!-- 预算管理页面 -->
+      <div class="page" data-page="budget">
+        <div class="section-title">预算管理</div>
+        <div class="form-group">
+          <div class="form-label">本月预算总额（元）</div>
+          <input type="number" class="text-input" id="budget-input" placeholder="如：10000" />
+        </div>
+        <div style="margin-top:10px"><button class="btn" id="budget-save-btn" style="width:100%">保存预算</button></div>
+
+        <div class="section-title">本月使用情况</div>
+        <div class="budget-card" id="budget-status-card">
+          <div class="budget-header">
+            <div id="budget-brief">0 / 0 (0%)</div>
+            <div style="color:var(--sub);font-size:13px">当月支出 / 预算总额</div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="budget-progress"></div></div>
+          <div class="progress-text" id="budget-percent">已用 0%</div>
+          <div id="budget-warning" style="margin-top:12px;padding:10px;border-radius:8px;display:none;font-size:13px;line-height:1.5"></div>
+        </div>
+      </div>
+
+      <!-- 分类管理 -->
+      <div class="page" data-page="category">
+        <div class="section-title">分类管理</div>
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <button class="btn" id="category-add-expense-btn" style="flex:1;background:var(--expense)">添加支出分类</button>
+          <button class="btn" id="category-add-income-btn" style="flex:1;background:var(--income)">添加收入分类</button>
+        </div>
+        <div id="category-container" class="transaction-list"></div>
+        <div style="margin-top:14px">
+          <button class="btn" id="category-back" style="width:100%;background:#9ca3af">返回记账</button>
+        </div>
+      </div>
+
+      <!-- 我的 -->
+      <div class="page" data-page="profile">
+        <!-- 登录界面 -->
+        <div id="login-section">
+          <div class="login-card">
+            <div class="login-title">👤 小账精</div>
+            <div class="login-subtitle">请输入用户名开始使用</div>
+            <input type="text" class="login-input" id="login-username" placeholder="输入用户名（昵称）">
+            <div class="login-buttons">
+              <button id="login-btn" style="background:var(--primary);color:#fff">登录</button>
+              <button id="guest-btn" style="background:#e5e7eb;color:var(--text)">游客使用</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 已登录界面 -->
+        <div id="profile-section" style="display:none;flex-direction:column;gap:16px">
+          <!-- 用户头部 -->
+          <div class="user-header">
+            <div class="user-avatar" id="profile-avatar">👤</div>
+            <div class="user-name" id="profile-nickname">用户昵称</div>
+            <div class="user-status" id="profile-status">已登录</div>
+          </div>
+
+          <!-- 账户信息 - 统一列表样式 -->
+          <div>
+            <div class="section-title" style="margin-bottom:8px">账户信息</div>
+            <div class="settings-group">
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-user" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">用户名</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="user-info-value" id="profile-username" style="color:var(--text);font-weight:500">-</span>
+                  <div class="user-info-edit" id="edit-username-btn" style="padding:4px 8px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:12px">编辑</div>
+                </div>
+              </div>
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-envelope" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">邮箱</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="user-info-value" id="profile-email" style="color:var(--text);font-weight:500">-</span>
+                  <div class="user-info-edit" id="edit-email-btn" style="padding:4px 8px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:12px">编辑</div>
+                </div>
+              </div>
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-smile" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">头像</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="user-info-value" id="profile-avatar-display" style="font-size:20px">👤</span>
+                  <div class="user-info-edit" id="edit-avatar-btn" style="padding:4px 8px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:12px">更改</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 通知提醒 - 统一列表样式 -->
+          <div>
+            <div class="section-title" style="margin-bottom:8px">通知提醒</div>
+            <div class="settings-group">
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-bell" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">预算提醒</span>
+                </div>
+                <div class="toggle-checkbox active" id="toggle-budget" data-key="budget_notifications"></div>
+              </div>
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-calendar-day" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">每日提醒</span>
+                </div>
+                <div class="toggle-checkbox" id="toggle-daily" data-key="daily_reminders"></div>
+              </div>
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-exclamation-triangle" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">超支警告</span>
+                </div>
+                <div class="toggle-checkbox active" id="toggle-warning" data-key="expense_warnings"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据管理 - 统一列表样式 -->
+          <div>
+            <div class="section-title" style="margin-bottom:8px">数据管理</div>
+            <div class="settings-group">
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-cloud-upload-alt" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">自动备份</span>
+                </div>
+                <div class="toggle-checkbox active" id="toggle-backup" data-key="auto_backup"></div>
+              </div>
+              <div class="settings-item">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-eye-slash" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label">隐藏金额</span>
+                </div>
+                <div class="toggle-checkbox" id="toggle-hide" data-key="hide_amounts"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 功能选项 - 统一列表样式 -->
+          <div>
+            <div class="section-title" style="margin-bottom:8px">功能</div>
+            <div class="settings-group">
+              <button class="settings-item" id="records-manage-btn" style="border:none;background:none;cursor:pointer;width:100%;text-align:left;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <i class="fas fa-list-alt" style="color:var(--primary);font-size:16px;width:20px"></i>
+                  <span class="settings-label" style="margin:0">账单管理</span>
+                </div>
+                <i class="fas fa-chevron-right" style="color:var(--sub);font-size:12px;flex-shrink:0"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 退出登录 -->
+          <div style="margin-top:8px">
+            <button id="logout-btn" style="width:100%;padding:14px;border:none;border-radius:12px;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;font-size:15px;box-shadow:0 2px 8px rgba(239,68,68,0.3);transition:all 0.2s">
+              <i class="fas fa-sign-out-alt" style="margin-right:8px"></i>退出登录
+            </button>
+          </div>
+
+          <!-- 版本信息 -->
+          <div style="text-align:center;color:var(--sub);font-size:12px;padding:16px 0;margin-top:8px">
+            小账精 v1.0 | © 2025
+          </div>
+        </div>
+      </div>
+
+      <!-- 账单管理 -->
+      <div class="page" data-page="records">
+        <div class="section-title">账单管理</div>
+        <div id="records-container" class="transaction-list"></div>
+        <div style="margin-top:14px"><button class="btn" id="records-back" style="width:100%;background:#9ca3af">返回</button></div>
+      </div>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="bottom-nav">
+      <div class="nav-item active" data-target="home"><i class="fas fa-home"></i><span>首页</span></div>
+      <div class="nav-item" data-target="record"><i class="fas fa-pen"></i><span>记账</span></div>
+      <div class="nav-item" data-target="stats"><i class="fas fa-chart-pie"></i><span>统计</span></div>
+      <div class="nav-item" data-target="search"><i class="fas fa-search"></i><span>搜索</span></div>
+      <div class="nav-item" data-target="profile"><i class="fas fa-user"></i><span>我的</span></div>
+    </div>
+  </div>
+
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script>
+    (function(){
+      const pages = Array.from(document.querySelectorAll(".page"));
+      const navItems = Array.from(document.querySelectorAll(".nav-item"));
+      const headerTitle = document.getElementById("header-title");
+      const headerSubtitle = document.getElementById("header-subtitle");
+      const headerAddBtn = document.getElementById("header-add-btn");
+
+      function showPage(name){
+        pages.forEach(p => p.classList.toggle("active", p.dataset.page===name));
+        navItems.forEach(n => n.classList.toggle("active", n.dataset.target===name));
+        const titles = {home:"首页",record:"记一笔",stats:"统计",search:"搜索",budget:"预算管理",category:"分类管理",profile:"我的",insights:"消费分析",records:"账单管理"};
+        headerTitle.textContent = titles[name] || "记账本";
+        headerSubtitle.textContent =
+          name==="home" ? "欢迎使用小账精" :
+          name==="record" ? "快速记录一笔收支" :
+          name==="stats" ? "查看收支结构与趋势" :
+          name==="search" ? "按商家或分类查找记录" :
+          name==="budget" ? "设置预算并查看当月使用" :
+          name==="category" ? "管理你的分类标签" :
+          name==="insights" ? "基于你的记录生成分析" :
+          name==="records" ? "查看和管理所有账单" :
+          "个人信息与应用说明";
+        headerAddBtn.style.display = name==="home" ? "flex" : "none";
+      }
+
+      navItems.forEach(n => n.addEventListener("click", ()=>{
+        const t = n.dataset.target;
+        showPage(t);
+        if (t==="home") loadHome();
+        if (t==="stats") loadStats();
+        if (t==="category") loadCategories();
+        if (t==="records") loadRecords();
+        if (t==="profile") loadUserProfile();
+        if (t==="budget") { loadHomeBudgetSection(); loadBudgetStatus(); }
+        if (t==="search") { loadSearchHistory(); }
+      }));
+      headerAddBtn.addEventListener("click", ()=> showPage("record"));
+
+      let backend = null; new QWebChannel(qt.webChannelTransport, ch=>{
+        backend = ch.objects.backend;
+        // 初始
+        setToday(); loadHome(); loadCategories(); bindRecord(); bindSearch(); bindBudget(); bindStats(); loadUserProfile(); loadSettings();
+      });
+
+      // 首页和预算功能
+      function loadHome(){
+        if(!backend) return;
+        backend.get_home_overview(function(resp){
+          try{
+            const d = JSON.parse(resp);
+            document.getElementById("home-balance").textContent = fmt(d.balance);
+            document.getElementById("home-income").textContent  = fmt(d.income);
+            document.getElementById("home-expense").textContent = fmt(d.expense);
+
+            const used = Number(d.budget_used||0), total = Number(d.budget_total||0), p = Number(d.budget_percent||0);
+            document.getElementById("home-budget-brief").textContent = `${fmtRaw(used)} / ${fmtRaw(total)} (${p}%)`;
+            document.getElementById("home-budget-percent").textContent = `已用 ${p}%`;
+            document.getElementById("home-budget-progress").style.width = `${p}%`;
+
+            const list = document.getElementById("home-recent-list"); list.innerHTML="";
+            (d.recent||[]).forEach(it=>{
+              const color = it.r_type==="income" ? "var(--income)" : "var(--expense)";
+              list.appendChild(el(`
+                <div class="transaction-item">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="transaction-category"><i class="fas fa-receipt"></i></div>
+                    <div>
+                      <div style="font-weight:700">${it.category||"未分类"}</div>
+                      <div style="font-size:13px;color:var(--sub)">${(it.store||"")+(it.date?(" · "+it.date):"")}</div>
+                    </div>
+                  </div>
+                  <div style="font-weight:700;color:${color}">${fmt(it.amount)}</div>
+                </div>`));
+            });
+          }catch(e){console.error(e)}
+        });
+      }
+      document.getElementById("home-budget-card").addEventListener("click",()=>{ showPage("budget"); loadHomeBudgetSection(); loadBudgetStatus(); });
+
+      function loadHomeBudgetSection(){
+        // 在预算页同步显示（当月使用/总额/百分比）
+        if(!backend) return;
+        backend.get_home_overview(function(resp){
+          try{
+            const d = JSON.parse(resp);
+            const used = Number(d.budget_used||0), total = Number(d.budget_total||0), p = Number(d.budget_percent||0);
+            document.getElementById("budget-brief").textContent = `${fmtRaw(used)} / ${fmtRaw(total)} (${p}%)`;
+            document.getElementById("budget-percent").textContent = `已用 ${p}%`;
+            document.getElementById("budget-progress").style.width = `${p}%`;
+          }catch(e){}
+        });
+      }
+
+      // 记账功能
+      function setToday(){
+        const inp = document.getElementById("record-date");
+        const today = new Date(); const m = String(today.getMonth()+1).padStart(2,"0");
+        const d = String(today.getDate()).padStart(2,"0");
+        inp.value = `${today.getFullYear()}-${m}-${d}`;
+      }
+
+      function bindRecord(){
+        const typeWrap = document.getElementById("record-type");
+        typeWrap.querySelectorAll(".switch-option").forEach(opt=>{
+          opt.addEventListener("click", ()=>{
+            typeWrap.querySelectorAll(".switch-option").forEach(o=>o.classList.remove("active"));
+            opt.classList.add("active");
+            // 切换显示不同类型分类（支出/收入）
+            loadCategoriesToRecord();
+          });
+        });
+
+        document.getElementById("record-manage-btn").addEventListener("click",()=>{
+          showPage("category"); loadCategories();
+        });
+        document.getElementById("record-clear-cat-btn").addEventListener("click",()=>{
+          document.querySelectorAll("#record-category-grid .category-item").forEach(i=> i.classList.remove("active"));
+        });
+
+        document.getElementById("record-save-btn").addEventListener("click", ()=>{
+          if(!backend) return;
+          const amount = parseFloat(document.getElementById("record-amount").value||"0");
+          if(!amount){ toast("请输入金额"); return; }
+          const type = document.querySelector("#record-type .switch-option.active")?.dataset.type || "expense";
+          const catEl = document.querySelector("#record-category-grid .category-item.active .category-name");
+          const category = catEl ? catEl.textContent.trim() : "其他";
+          const note  = document.getElementById("record-note").value || "";
+          const store = document.getElementById("record-store").value || "";
+          const record_date = document.getElementById("record-date").value;
+
+          backend.add_record(JSON.stringify({amount:amount, r_type:type, category, note, store, record_date}), function(r){
+            try{
+              const res = JSON.parse(r); if(res.ok){
+                toast("记录已保存");
+                document.getElementById("record-amount").value="";
+                document.getElementById("record-note").value="";
+                document.getElementById("record-store").value="";
+                loadHome(); loadStats();
+                // 如果是支出记录，检查预算状态
+                if(type === "expense" && backend){
+                  setTimeout(()=>{ loadBudgetStatus(); }, 500);
+                }
+              }else{ toast("保存失败："+(res.error||"未知错误")); }
+            }catch(e){ toast("保存失败"); }
+          });
+        });
+
+        loadCategoriesToRecord();
+      }
+
+      function loadCategoriesToRecord(){
+        if(!backend) return;
+        backend.get_categories(function(resp){
+          try{
+            const list = JSON.parse(resp)||[];
+            const type = document.querySelector("#record-type .switch-option.active")?.dataset.type || "expense";
+            const filtered = list.filter(x => (x.c_type||"expense") === type);
+            const grid = document.getElementById("record-category-grid");
+            grid.innerHTML="";
+            filtered.forEach(item=>{
+              if(!item.name) return;
+              const node = el(`
+                <div class="category-item">
+                  <div class="category-name">${item.name}</div>
+                  <div style="font-size:12px;color:var(--sub)">${ type==="income" ? "收入分类":"支出分类" }</div>
+                </div>`);
+              node.addEventListener("click", ()=>{
+                if(node.classList.contains("active")){
+                  node.classList.remove("active");
+                  return;
+                }
+                grid.querySelectorAll(".category-item").forEach(i=>i.classList.remove("active"));
+                node.classList.add("active");
+              });
+              grid.appendChild(node);
+            });
+          }catch(e){}
+        });
+      }
+
+      // 分类管理
+      function loadCategories(){
+        if(!backend) return;
+        backend.get_categories(function(resp){
+          try{
+            const list = JSON.parse(resp)||[];
+            const ctn = document.getElementById("category-container"); ctn.innerHTML = "";
+            list.forEach(item=>{
+              if(!item.name) return;
+              ctn.appendChild(el(`
+                <div class="transaction-item">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="transaction-category"><i class="fas fa-folder"></i></div>
+                    <div>
+                      <div style="font-weight:700">${item.name}</div>
+                      <div style="font-size:13px;color:var(--sub)">${(item.c_type==="income"?"收入":"支出")}分类</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <button class="icon-button edit" data-id="${item.category_id}" data-name="${item.name}" data-type="${item.c_type}" title="编辑"><i class="fas fa-pen"></i></button>
+                    <button class="icon-button del" data-id="${item.category_id}" title="删除"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>`));
+            });
+            ctn.querySelectorAll(".edit").forEach(b=> b.addEventListener("click",()=>{
+              const id = parseInt(b.dataset.id);
+              const oldName = b.dataset.name;
+              const oldType = b.dataset.type;
+              const newName = prompt("分类名称：", oldName);
+              if(newName === null) return; // 用户取消
+              const typeChoice = prompt("分类类型（输入 1=收入，2=支出，直接回车保持原类型）：", oldType==="income"?"1":"2");
+              let newType = oldType;
+              if(typeChoice === "1") newType = "income";
+              else if(typeChoice === "2") newType = "expense";
+              // 调用后端接口
+              backend.edit_category(JSON.stringify({category_id: id, name: newName, c_type: newType}), function(r){
+                try{
+                  const res = JSON.parse(r);
+                  if(res.ok){
+                    toast("分类已更新");
+                    loadCategories(); loadCategoriesToRecord();
+                  }else{
+                    toast("更新失败："+(res.error||"未知错误"));
+                  }
+                }catch(e){ toast("更新失败"); }
+              });
+            }));
+            ctn.querySelectorAll(".del").forEach(b=> b.addEventListener("click",()=>{
+              const id = parseInt(b.dataset.id);
+              if(confirm("确定删除该分类？") && backend) {
+                backend.delete_category(id, function(r){
+                  try{
+                    const res = JSON.parse(r);
+                    if(res.ok){
+                      toast("分类已删除");
+                      loadCategories(); loadCategoriesToRecord();
+                    }else{
+                      toast("删除失败："+(res.error||"未知错误"));
+                    }
+                  }catch(e){ toast("删除失败"); }
+                });
+              }
+            }));
+          }catch(e){}
+        });
+      }
+      document.getElementById("category-add-expense-btn").addEventListener("click",()=>{
+        if(!backend) return;
+        const name = prompt("新支出分类名称：");
+        if(!name) return;
+        backend.add_category(JSON.stringify({name: name, c_type: "expense"}), function(r){
+          try{
+            const res = JSON.parse(r);
+            if(res.ok){
+              toast("支出分类已添加");
+              loadCategories(); loadCategoriesToRecord();
+            }else{
+              toast("添加失败："+(res.error||"未知错误"));
+            }
+          }catch(e){ toast("添加失败"); }
+        });
+      });
+      document.getElementById("category-add-income-btn").addEventListener("click",()=>{
+        if(!backend) return;
+        const name = prompt("新收入分类名称：");
+        if(!name) return;
+        backend.add_category(JSON.stringify({name: name, c_type: "income"}), function(r){
+          try{
+            const res = JSON.parse(r);
+            if(res.ok){
+              toast("收入分类已添加");
+              loadCategories(); loadCategoriesToRecord();
+            }else{
+              toast("添加失败："+(res.error||"未知错误"));
+            }
+          }catch(e){ toast("添加失败"); }
+        });
+      });
+      document.getElementById("category-back").addEventListener("click",()=>{ showPage("record"); });
+
+      // 账单管理
+      function loadRecords(){
+        if(!backend) return;
+        backend.get_all_records(function(resp){
+          try{
+            const d = JSON.parse(resp)||{};
+            const list = d.records||[];
+            const ctn = document.getElementById("records-container"); ctn.innerHTML = "";
+            if(list.length === 0){
+              ctn.innerHTML = '<div style="text-align:center;padding:20px;color:var(--sub)">暂无账单记录</div>';
+              return;
+            }
+            list.forEach(item=>{
+              const color = item.r_type==="income" ? "var(--income)" : "var(--expense)";
+              ctn.appendChild(el(`
+                <div class="transaction-item">
+                  <div style="display:flex;align-items:center;gap:10px;flex:1">
+                    <div class="transaction-category"><i class="fas fa-receipt"></i></div>
+                    <div style="flex:1">
+                      <div style="font-weight:700">${item.category||"未分类"}</div>
+                      <div style="font-size:13px;color:var(--sub)">${(item.store||"")+(item.date?(" · "+item.date):"")}</div>
+                      ${item.note ? `<div style="font-size:12px;color:var(--sub);margin-top:2px">${item.note}</div>` : ""}
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+                    <div style="font-weight:700;color:${color}">${fmt(item.amount)}</div>
+                    <div style="display:flex;gap:8px">
+                      <button class="icon-button edit-record" data-id="${item.record_id}" title="编辑"><i class="fas fa-pen"></i></button>
+                      <button class="icon-button del-record" data-id="${item.record_id}" title="删除"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </div>
+                </div>`));
+            });
+            // 绑定编辑和删除事件
+            ctn.querySelectorAll(".edit-record").forEach(b=> b.addEventListener("click",()=>{
+              const id = parseInt(b.dataset.id);
+              editRecord(id);
+            }));
+            ctn.querySelectorAll(".del-record").forEach(b=> b.addEventListener("click",()=>{
+              const id = parseInt(b.dataset.id);
+              if(confirm("确定删除这条账单记录？") && backend) {
+                backend.delete_record(id, function(r){
+                  try{
+                    const res = JSON.parse(r);
+                    if(res.ok){
+                      toast("账单已删除");
+                      loadRecords(); loadHome(); loadStats();
+                    }else{
+                      toast("删除失败："+(res.error||"未知错误"));
+                    }
+                  }catch(e){ toast("删除失败"); }
+                });
+              }
+            }));
+          }catch(e){ console.error(e); }
+        });
+      }
+
+      function editRecord(recordId){
+        if(!backend) return;
+        // 先获取记录详情
+        backend.get_all_records(function(resp){
+          try{
+            const d = JSON.parse(resp)||{};
+            const list = d.records||[];
+            const record = list.find(r=>r.record_id === recordId);
+            if(!record){
+              toast("未找到该记录");
+              return;
+            }
+            // 弹出编辑对话框
+            const amount = prompt("金额：", record.amount);
+            if(amount === null) return;
+            const typeChoice = prompt("类型（输入 1=收入，2=支出，直接回车保持原类型）：", record.r_type==="income"?"1":"2");
+            let r_type = record.r_type;
+            if(typeChoice === "1") r_type = "income";
+            else if(typeChoice === "2") r_type = "expense";
+            const category = prompt("分类：", record.category) || record.category;
+            const note = prompt("备注（可选）：", record.note || "") || "";
+            const store = prompt("商家/场所（可选）：", record.store || "") || "";
+            const record_date = prompt("日期（YYYY-MM-DD）：", record.date || "");
+            // 调用后端接口
+            backend.edit_record(JSON.stringify({
+              record_id: recordId,
+              amount: parseFloat(amount),
+              r_type: r_type,
+              category: category,
+              note: note,
+              store: store,
+              record_date: record_date || record.date
+            }), function(r){
+              try{
+                const res = JSON.parse(r);
+                if(res.ok){
+                  toast("账单已更新");
+                  loadRecords(); loadHome(); loadStats();
+                }else{
+                  toast("更新失败："+(res.error||"未知错误"));
+                }
+              }catch(e){ toast("更新失败"); }
+            });
+          }catch(e){ toast("获取记录失败"); }
+        });
+      }
+
+      document.getElementById("records-manage-btn").addEventListener("click",()=>{ showPage("records"); loadRecords(); });
+      document.getElementById("records-back").addEventListener("click",()=>{ showPage("profile"); });
+
+      // 用户和设置
+      function loadUserProfile(){
+        if(!backend) return;
+        backend.get_user_profile(function(resp){
+          try{
+            const user = JSON.parse(resp);
+            if(user.is_logged_in){
+              document.getElementById("login-section").style.display = "none";
+              document.getElementById("profile-section").style.display = "flex";
+              const name = user.nickname || user.username || "";
+              document.getElementById("profile-nickname").textContent = name;
+              document.getElementById("profile-username").textContent = user.username;
+              document.getElementById("profile-email").textContent = user.email || "未设置";
+              document.getElementById("profile-avatar").textContent = user.avatar_emoji || "👤";
+              document.getElementById("profile-avatar-display").textContent = user.avatar_emoji || "👤";
+              // 更新顶部欢迎文案
+              if(typeof headerSubtitle !== "undefined") headerSubtitle.textContent = "欢迎回来，" + name;
+              if(typeof headerTitle !== "undefined") headerTitle.textContent = name || headerTitle.textContent;
+            }else{
+              document.getElementById("login-section").style.display = "flex";
+              document.getElementById("profile-section").style.display = "none";
+              // 未登录时恢复默认表头
+              if(typeof headerTitle !== "undefined") headerTitle.textContent = "首页";
+              if(typeof headerSubtitle !== "undefined") headerSubtitle.textContent = "欢迎使用小账精";
+            }
+          }catch(e){ console.error(e); }
+        });
+      }
+
+      function loadSettings(){
+        if(!backend) return;
+        backend.get_settings(function(resp){
+          try{
+            const settings = JSON.parse(resp);
+            document.getElementById("toggle-budget").classList.toggle("active", settings.budget_notifications);
+            document.getElementById("toggle-daily").classList.toggle("active", settings.daily_reminders);
+            document.getElementById("toggle-warning").classList.toggle("active", settings.expense_warnings);
+            document.getElementById("toggle-backup").classList.toggle("active", settings.auto_backup);
+            document.getElementById("toggle-hide").classList.toggle("active", settings.hide_amounts);
+          }catch(e){ console.error(e); }
+        });
+      }
+
+      // 登录事件
+      document.getElementById("login-btn").addEventListener("click", ()=>{
+        const username = document.getElementById("login-username").value.trim();
+        if(!username){
+          toast("请输入用户名");
+          return;
+        }
+        backend.user_login(JSON.stringify({username: username}), function(r){
+          try{
+            const res = JSON.parse(r);
+            if(res.ok){
+              toast("登录成功");
+              loadUserProfile();
+              loadSettings();
+            }else{
+              toast("登录失败："+(res.error||"未知错误"));
+            }
+          }catch(e){ toast("登录失败"); }
+        });
+      });
+
+      // 游客使用
+      document.getElementById("guest-btn").addEventListener("click", ()=>{
+        backend.user_login(JSON.stringify({username: "游客"}), function(r){
+          try{
+            const res = JSON.parse(r);
+            if(res.ok){
+              toast("已使用游客模式");
+              loadUserProfile();
+              loadSettings();
+            }
+          }catch(e){ }
+        });
+      });
+
+      // 登出事件
+      document.getElementById("logout-btn").addEventListener("click", ()=>{
+        if(confirm("确定要退出登录吗？")){
+          backend.user_logout(function(r){
+            try{
+              const res = JSON.parse(r);
+              if(res.ok){
+                toast("已退出登录");
+                document.getElementById("login-username").value = "";
+                loadUserProfile();
+              }
+            }catch(e){ }
+          });
+        }
+      });
+
+      // 编辑用户名
+      document.getElementById("edit-username-btn").addEventListener("click", ()=>{
+        const username = prompt("请输入用户名：", document.getElementById("profile-username").textContent);
+        if(username !== null && username.trim()){
+          // 同时传 nickname，确保显示名同步更新
+          backend.update_user_profile(JSON.stringify({username: username.trim(), nickname: username.trim()}), function(r){
+            try{
+              const res = JSON.parse(r);
+              if(res.ok){
+                toast("用户名已更新");
+                // 使用后端返回的 user 对象，立即更新页面中所有相关显示
+                if(res.user){
+                  const name = res.user.nickname || res.user.username || "";
+                  // 更新个人资料区
+                  const pn = document.getElementById("profile-nickname"); if(pn) pn.textContent = name;
+                  const pu = document.getElementById("profile-username"); if(pu) pu.textContent = res.user.username || "-";
+                  const pe = document.getElementById("profile-email"); if(pe) pe.textContent = res.user.email || "未设置";
+                  const pa = document.getElementById("profile-avatar"); if(pa) pa.textContent = res.user.avatar_emoji || "👤";
+                  const pad = document.getElementById("profile-avatar-display"); if(pad) pad.textContent = res.user.avatar_emoji || "👤";
+                  // 更新顶部表头为欢迎文案
+                  if(typeof headerTitle !== "undefined") headerTitle.textContent = name || headerTitle.textContent;
+                  if(typeof headerSubtitle !== "undefined") headerSubtitle.textContent = "欢迎回来，" + (name || "");
+                }
+                // 同步刷新后端加载的用户信息（持久化后以防万一）
+                loadUserProfile();
+              }else{
+                toast("更新失败："+(res.error||"未知错误"));
+              }
+            }catch(e){ toast("更新失败"); }
+          });
+        }
+      });
+
+      // 编辑邮箱
+      document.getElementById("edit-email-btn").addEventListener("click", ()=>{
+        const email = prompt("请输入邮箱地址：", document.getElementById("profile-email").textContent);
+        if(email !== null){
+          backend.update_user_profile(JSON.stringify({email: email}), function(r){
+            try{
+              const res = JSON.parse(r);
+              if(res.ok){
+                toast("邮箱已更新");
+                loadUserProfile();
+              }
+            }catch(e){ }
+          });
+        }
+      });
+
+      // 编辑头像
+      const avatars = ["👤", "😀", "😎", "🎉", "🔥", "⭐", "🎯", "💎"];
+      document.getElementById("edit-avatar-btn").addEventListener("click", ()=>{
+        let choice = prompt("选择头像 (0-7)，或输入emoji:\n" + avatars.join(" "), "0");
+        if(choice !== null){
+          let avatar = avatars[parseInt(choice)] || choice;
+          backend.update_user_profile(JSON.stringify({avatar_emoji: avatar}), function(r){
+            try{
+              const res = JSON.parse(r);
+              if(res.ok){
+                toast("头像已更新");
+                loadUserProfile();
+              }
+            }catch(e){ }
+          });
+        }
+      });
+
+      // 切换通知设置
+      document.querySelectorAll(".toggle-checkbox").forEach(toggle=>{
+        toggle.addEventListener("click", function(){
+          const key = this.dataset.key;
+          const value = !this.classList.contains("active");
+          const updates = {};
+          updates[key] = value;
+          backend.update_settings(JSON.stringify(updates), function(r){
+            try{
+              const res = JSON.parse(r);
+              if(res.ok){
+                document.querySelector(`.toggle-checkbox[data-key="${key}"]`).classList.toggle("active", value);
+                toast("设置已保存");
+              }
+            }catch(e){ }
+          });
+        });
+      });
+
+      // 搜索功能
+      let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+
+      function bindSearch(){
+        // 加载分类列表
+        if(backend){
+          backend.get_search_categories(function(resp){
+            try{
+              const cats = JSON.parse(resp)||[];
+              const select = document.getElementById("search-category");
+              select.innerHTML = '<option value="">全部</option>';
+              cats.forEach(cat=>{
+                const opt = document.createElement("option");
+                opt.value = cat.name;
+                opt.textContent = cat.name;
+                select.appendChild(opt);
+              });
+            }catch(e){}
+          });
+        }
+
+        // 加载搜索历史
+        loadSearchHistory();
+
+        // 搜索按钮
+        document.getElementById("search-btn").addEventListener("click", performSearch);
+        
+        // 回车搜索
+        document.getElementById("search-keyword").addEventListener("keydown", e=>{
+          if(e.key==="Enter") performSearch();
+        });
+
+        // 重置按钮
+        document.getElementById("search-reset-btn").addEventListener("click", ()=>{
+          document.getElementById("search-keyword").value = "";
+          document.getElementById("search-category").value = "";
+          document.getElementById("search-amount-min").value = "";
+          document.getElementById("search-amount-max").value = "";
+          document.getElementById("search-start-date").value = "";
+          document.getElementById("search-end-date").value = "";
+          document.getElementById("search-results").innerHTML = "";
+          document.getElementById("search-summary").textContent = "共 0 条记录";
+        });
+
+        // 清空历史
+        document.getElementById("search-clear-history").addEventListener("click", ()=>{
+          if(confirm("确定要清空搜索历史吗？")){
+            searchHistory = [];
+            localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+            loadSearchHistory();
+          }
+        });
+      }
+
+      function performSearch(){
+        if(!backend) return;
+        const keyword = document.getElementById("search-keyword").value.trim();
+        const category = document.getElementById("search-category").value;
+        const amountMin = document.getElementById("search-amount-min").value;
+        const amountMax = document.getElementById("search-amount-max").value;
+        const startDate = document.getElementById("search-start-date").value;
+        const endDate = document.getElementById("search-end-date").value;
+
+        const searchParams = {};
+        if(keyword) searchParams.keyword = keyword;
+        if(category) searchParams.category = category;
+        if(amountMin) searchParams.amount_min = amountMin;
+        if(amountMax) searchParams.amount_max = amountMax;
+        if(startDate) searchParams.start_date = startDate;
+        if(endDate) searchParams.end_date = endDate;
+
+        // 保存搜索历史（去重）
+        const historyKey = JSON.stringify(searchParams);
+        if(historyKey && !searchHistory.includes(historyKey)){
+          searchHistory.unshift(historyKey);
+          // 最多保存10条
+          if(searchHistory.length > 10) searchHistory.pop();
+          localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+          loadSearchHistory();
+        }
+
+        backend.search(JSON.stringify(searchParams), function(resp){
+          try{
+            const d = JSON.parse(resp)||{}; 
+            const list = d.records||[]; 
+            const results = document.getElementById("search-results");
+            const summary = document.getElementById("search-summary");
+            results.innerHTML=""; 
+            let total=0;
+            list.forEach(it=>{
+              total += Number(it.amount)||0;
+              const color = it.r_type==="income" ? "var(--income)" : "var(--expense)";
+              results.appendChild(el(`
+                <div class="transaction-item">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="transaction-category"><i class="fas fa-search"></i></div>
+                    <div>
+                      <div style="font-weight:700">${it.category||"未分类"}</div>
+                      <div style="font-size:13px;color:var(--sub)">${(it.store||"")+(it.date?(" · "+it.date):"")}</div>
+                      ${it.note ? `<div style="font-size:12px;color:var(--sub);margin-top:2px">${it.note}</div>` : ""}
+                    </div>
+                  </div>
+                  <div style="font-weight:700;color:${color}">${fmt(it.amount)}</div>
+                </div>`));
+            });
+            summary.textContent = `共 ${list.length} 条记录 · 合计 ${fmtRaw(total)}`;
+          }catch(e){ console.error(e); }
+        });
+      }
+
+      function loadSearchHistory(){
+        const historyDiv = document.getElementById("search-history");
+        historyDiv.innerHTML = "";
+        if(searchHistory.length === 0){
+          historyDiv.innerHTML = '<div style="color:var(--sub);font-size:12px">暂无搜索历史</div>';
+          return;
+        }
+        searchHistory.forEach((historyItem, index)=>{
+          try{
+            const params = JSON.parse(historyItem);
+            const label = [
+              params.keyword ? `关键字:${params.keyword}` : "",
+              params.category ? `分类:${params.category}` : "",
+              params.amount_min || params.amount_max ? `金额:${params.amount_min||0}-${params.amount_max||"∞"}` : "",
+              params.start_date || params.end_date ? `日期:${params.start_date||""}-${params.end_date||""}` : ""
+            ].filter(x=>x).join(" ") || "全部";
+            
+            const tag = el(`
+              <div style="padding:4px 10px;background:#f3f4f6;border-radius:12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">
+                <span>${label}</span>
+                <i class="fas fa-times" style="font-size:10px;color:var(--sub)"></i>
+              </div>
+            `);
+            tag.addEventListener("click", ()=>{
+              // 点击历史记录，填充搜索条件并执行搜索
+              if(params.keyword) document.getElementById("search-keyword").value = params.keyword;
+              if(params.category) document.getElementById("search-category").value = params.category;
+              if(params.amount_min) document.getElementById("search-amount-min").value = params.amount_min;
+              if(params.amount_max) document.getElementById("search-amount-max").value = params.amount_max;
+              if(params.start_date) document.getElementById("search-start-date").value = params.start_date;
+              if(params.end_date) document.getElementById("search-end-date").value = params.end_date;
+              performSearch();
+            });
+            // 删除历史记录
+            tag.querySelector("i").addEventListener("click", (e)=>{
+              e.stopPropagation();
+              searchHistory.splice(index, 1);
+              localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+              loadSearchHistory();
+            });
+            historyDiv.appendChild(tag);
+          }catch(e){}
+        });
+      }
+
+      // 预算功能
+      function bindBudget(){
+        document.getElementById("budget-save-btn").addEventListener("click", ()=>{
+          const v = document.getElementById("budget-input").value || "0";
+          backend.save_budget(v, function(){
+            toast("预算已保存");
+            // 重新从后端获取用于刷新百分比（避免归零）
+            loadHome(); loadHomeBudgetSection(); loadBudgetStatus();
+          });
+        });
+      }
+
+      function loadBudgetStatus(){
+        if(!backend) return;
+        backend.get_budget_status(function(resp){
+          try{
+            const d = JSON.parse(resp)||{};
+            const level = d.level || "normal";
+            const message = d.message || "";
+            const percent = Number(d.percent||0);
+            const used = Number(d.used||0);
+            const total = Number(d.total||0);
+            
+            const card = document.getElementById("budget-status-card");
+            const progress = document.getElementById("budget-progress");
+            const warning = document.getElementById("budget-warning");
+            
+            // 根据预算使用情况设置颜色
+            let cardColor = "#fff";
+            let progressColor = "#10b981";
+            let warningColor = "#10b981";
+            let warningText = "";
+            let showWarning = false;
+            
+            if(level === "over" || percent >= 100){
+              cardColor = "#fee2e2"; // 浅红色背景
+              progressColor = "#ef4444"; // 红色进度条
+              warningColor = "#dc2626"; // 深红色文字
+              warningText = "⚠️ 主人，月底要吃土啦！预算已超出，请控制支出！";
+              showWarning = true;
+              // 弹窗红色预警
+              setTimeout(()=>{
+                showBudgetAlert("预算超支预警", message || "主人主人！！！再乱花钱月底要吃土啦！！！", "error");
+              }, 300);
+            } else if(level === "warning" || percent >= 80){
+              cardColor = "#fef3c7"; // 浅黄色背景
+              progressColor = "#f59e0b"; // 橙色进度条
+              warningColor = "#d97706"; // 深橙色文字
+              warningText = "⚠️ 预算使用已超过80%，请注意控制支出！";
+              showWarning = true;
+            } else if(level === "tight" || percent >= 50){
+              cardColor = "#fef3c7"; // 浅黄色背景
+              progressColor = "#f59e0b"; // 橙色进度条
+              warningColor = "#d97706"; // 深橙色文字
+              warningText = "💡 预算使用已过半，建议关注后续支出。";
+              showWarning = true;
+            } else {
+              cardColor = "#f0fdf4"; // 浅绿色背景
+              progressColor = "#10b981"; // 绿色进度条
+              warningColor = "#059669"; // 深绿色文字
+              warningText = "✅ 预算使用正常，继续保持！";
+              showWarning = true;
+            }
+            
+            // 应用样式
+            card.style.background = cardColor;
+            progress.style.background = progressColor;
+            warning.style.color = warningColor;
+            warning.style.background = cardColor;
+            warning.textContent = warningText;
+            warning.style.display = showWarning ? "block" : "none";
+            
+            // 更新进度条
+            progress.style.width = `${Math.min(100, percent)}%`;
+            
+          }catch(e){ console.error(e); }
+        });
+      }
+
+      function showBudgetAlert(title, message, type){
+        const alertDiv = document.createElement("div");
+        alertDiv.style.cssText = `
+          position:fixed; left:50%; top:50%; transform:translate(-50%, -50%);
+          background:${type==="error"?"#dc2626":"#f59e0b"}; color:#fff;
+          border-radius:16px; padding:20px; max-width:320px; z-index:2000;
+          box-shadow:0 20px 40px rgba(0,0,0,0.3); text-align:center;
+        `;
+        alertDiv.innerHTML = `
+          <div style="font-size:18px;font-weight:700;margin-bottom:12px">${title}</div>
+          <div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${message}</div>
+          <button id="budget-alert-close" style="margin-top:16px;padding:8px 20px;background:rgba(255,255,255,0.2);border:none;border-radius:8px;color:#fff;cursor:pointer;font-weight:700">知道了</button>
+        `;
+        document.body.appendChild(alertDiv);
+        alertDiv.querySelector("#budget-alert-close").addEventListener("click", ()=>{
+          alertDiv.remove();
+        });
+        // 5秒后自动关闭
+        setTimeout(()=>{ if(alertDiv.parentNode) alertDiv.remove(); }, 5000);
+      }
+
+      // 统计功能
+      let chartMode = "expense"; // 默认看支出分类
+      let currentPeriod = "month"; // 当前选择的时间范围
+      let customStartDate = null;
+      let customEndDate = null;
+
+      function bindStats(){
+        document.getElementById("open-insights").addEventListener("click", ()=>{
+          showPage("insights");
+          // 生成分析
+          backend.get_ai_analysis("month", function(txt){ document.getElementById("insights-text").textContent = txt; });
+        });
+        document.getElementById("insights-back").addEventListener("click", ()=>{ showPage("stats"); });
+
+        document.getElementById("stats-expense-card").addEventListener("click", ()=>{ chartMode="expense"; loadStats(); });
+        document.getElementById("stats-income-card").addEventListener("click", ()=>{ chartMode="income";  loadStats(); });
+
+        // 时间范围选择按钮
+        document.querySelectorAll("[data-period]").forEach(btn => {
+          btn.addEventListener("click", ()=>{
+            const period = btn.dataset.period;
+            currentPeriod = period;
+            // 更新按钮样式
+            document.querySelectorAll("[data-period]").forEach(b => {
+              b.style.background = b === btn ? "var(--primary)" : "";
+            });
+            // 显示/隐藏自定义日期选择
+            const customRange = document.getElementById("custom-date-range");
+            if(period === "custom"){
+              customRange.style.display = "flex";
+              customRange.style.flexDirection = "column";
+            } else {
+              customRange.style.display = "none";
+              loadStats();
+            }
+          });
+        });
+
+        // 自定义日期应用按钮
+        document.getElementById("stats-apply-custom").addEventListener("click", ()=>{
+          const startDate = document.getElementById("stats-start-date").value;
+          const endDate = document.getElementById("stats-end-date").value;
+          if(startDate && endDate){
+            customStartDate = startDate;
+            customEndDate = endDate;
+            loadStats();
+          } else {
+            toast("请选择开始和结束日期");
+          }
+        });
+      }
+
+      function loadStats(){
+        if(!backend) return;
+        const params = {period: currentPeriod};
+        if(currentPeriod === "custom" && customStartDate && customEndDate){
+          params.start_date = customStartDate;
+          params.end_date = customEndDate;
+        }
+        backend.get_statistics(JSON.stringify(params), function(resp){
+          try{
+            const obj = JSON.parse(resp)||{};
+            document.getElementById("stats-expense").textContent = fmt(obj.totals?.expense||0);
+            document.getElementById("stats-income").textContent  = fmt(obj.totals?.income||0);
+
+            // 趋势折线图
+            const trendData = obj.trendData || {dates: [], income: [], expense: []};
+            const trendDom = document.getElementById("trend-chart");
+            const trendChart = echarts.getInstanceByDom(trendDom) || echarts.init(trendDom);
+            // 格式化日期显示（只显示月-日）
+            const formattedDates = trendData.dates.map(d => {
+              const date = new Date(d);
+              return `${date.getMonth()+1}-${date.getDate()}`;
+            });
+            trendChart.setOption({
+              tooltip:{trigger:"axis", formatter:function(params){
+                let result = params[0].axisValue + "<br/>";
+                params.forEach(p => {
+                  result += `${p.seriesName}: ${fmt(p.value)}<br/>`;
+                });
+                return result;
+              }},
+              legend:{data:["收入","支出"], bottom:"5%", textStyle:{color:"#4b5563", fontSize:12}},
+              grid:{left:"3%", right:"4%", bottom:"15%", top:"10%", containLabel:true},
+              xAxis:{type:"category", data:formattedDates, boundaryGap:false, axisLabel:{fontSize:10}},
+              yAxis:{type:"value", axisLabel:{formatter:"¥{value}", fontSize:10}},
+              series:[
+                {name:"收入", type:"line", data:trendData.income, smooth:true, itemStyle:{color:"#10b981"}, areaStyle:{opacity:0.2}},
+                {name:"支出", type:"line", data:trendData.expense, smooth:true, itemStyle:{color:"#ef4444"}, areaStyle:{opacity:0.2}}
+              ]
+            }, true);
+
+            // 分类饼图
+            const seriesData = (chartMode==="income" ? (obj.incomeSeries||[]) : (obj.expenseSeries||[]));
+            const dom = document.getElementById("main-chart");
+            const chart = echarts.getInstanceByDom(dom) || echarts.init(dom);
+            chart.setOption({
+              tooltip:{trigger:"item", formatter:"{b}: {c} ({d}%)"},
+              legend:{bottom:"5%",left:"center",textStyle:{color:"#4b5563"}},
+              series:[{
+                type:"pie", name: chartMode==="income"?"收入分布":"支出分布",
+                radius:["40%","70%"], avoidLabelOverlap:false,
+                itemStyle:{borderRadius:8,borderColor:"#fff",borderWidth:2},
+                label:{show:false}, emphasis:{label:{show:true,fontSize:14,fontWeight:"bold"}},
+                labelLine:{show:false}, data: seriesData
+              }]}
+            , true);
+          }catch(e){ console.error(e); }
+        });
+      }
+
+      // 工具函数
+      function fmt(n){ const v = Number(n)||0; return "¥"+v.toFixed(2); }
+      function fmtRaw(n){ const v = Number(n)||0; return v.toFixed(2); }
+      function el(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstElementChild; }
+      function toast(msg){
+        const div = document.createElement("div");
+        div.style.cssText = "position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;border-radius:999px;padding:8px 14px;font-size:13px;z-index:1000;";
+        div.textContent = msg; document.body.appendChild(div);
+        setTimeout(()=>{ div.remove(); }, 1400);
+      }
+
+    })();
+  </script>
+</body>
+</html>

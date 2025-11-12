@@ -1,13 +1,3 @@
-"""Input parsing helpers.
-
-This module defines functions to safely parse strings into
-numerical and date types. They are used primarily by the
-command line interface to validate user input before passing
-values to the business logic layer. Each function returns
-``None`` on failure rather than raising an exception, which
-allows the caller to implement custom error handling logic.
-"""
-
 from datetime import datetime, date
 from typing import Optional
 

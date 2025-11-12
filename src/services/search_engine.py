@@ -1,21 +1,8 @@
-"""Search engine for querying records.
-
-The :class:`SearchEngine` provides a set of methods for
-filtering a collection of records based on different criteria
-such as store, category or date range. It also keeps an
-internal history of search queries that have been executed to
-enable features like displaying recent searches to the user.
-"""
-
 from datetime import date
 from typing import List, Optional
-
 from src.models.record import Record
 
-
 class SearchEngine:
-    """Implements various search strategies over a list of records."""
-
     def __init__(self, records: List[Record]) -> None:
         self.records = records
         self.history: List[str] = []
@@ -46,28 +33,6 @@ class SearchEngine:
         start: Optional[date] = None,
         end: Optional[date] = None,
     ) -> List[Record]:
-        """Perform an advanced search combining multiple filters.
-
-        Parameters
-        ----------
-        store : str, optional
-            If provided, only records matching this store are returned.
-        category : str, optional
-            If provided, only records belonging to this category are
-            returned.
-        start : date, optional
-            The start date for the date range filter. Must be used
-            together with ``end``.
-        end : date, optional
-            The end date for the date range filter. Must be used
-            together with ``start``.
-
-        Returns
-        -------
-        list of Record
-            A list of records satisfying all specified filters. If no
-            filters are provided, the entire record list is returned.
-        """
         result: List[Record] = list(self.records)
         if store:
             result = [r for r in result if r.store.lower() == store.lower()]

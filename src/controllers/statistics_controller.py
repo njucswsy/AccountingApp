@@ -1,12 +1,3 @@
-"""Controller for retrieving statistical summaries.
-
-The :class:`StatisticsController` offers a simple API for
-fetching aggregated information about records. Internally it
-delegates the computation to the :class:`Statistics` model.
-This separation ensures that controllers remain thin and do not
-contain business logic beyond orchestration.
-"""
-
 from typing import Dict, List
 
 from src.models.record import Record

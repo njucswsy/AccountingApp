@@ -1,15 +1,7 @@
-"""Controller for managing record CRUD operations.
-
-The :class:`RecordController` exposes methods to create, read,
-update and delete records, and also to manage categories. It
-acts as a facade over the :class:`StorageService` and domain
-models, providing a simpler API for the user interface layer
-to work with. All changes to records or categories are
-immediately persisted via the storage service.
-"""
-
 from datetime import date
 from typing import List, Optional
+from typing import Tuple
+
 
 from src.models.record import Record
 from src.models.category import Category
@@ -43,31 +35,6 @@ class RecordController:
         note: str = "",
         store: str = "",
     ) -> Record:
-        """Create and persist a new record.
-
-        Parameters
-        ----------
-        amount : float
-            The transaction amount. Use positive values for both
-            income and expense; the ``r_type`` determines the sign
-            when computing statistics.
-        r_type : str
-            Either ``income`` or ``expense``. This method does not
-            validate the string beyond checking these two values.
-        category : str
-            The name of the category to which this record belongs.
-        record_date : date
-            The date of the transaction.
-        note : str, optional
-            Free-form text description of the transaction.
-        store : str, optional
-            The store or merchant associated with this record.
-
-        Returns
-        -------
-        Record
-            The newly created record.
-        """
         new_id = self._get_next_record_id()
         record = Record(
             record_id=new_id,
@@ -80,21 +47,14 @@ class RecordController:
         )
         self.records.append(record)
         self.storage.save_records(self.records)
-        # Update budget spending if this is an expense
-        if r_type == "expense":
+        # Update budget spending if this is an expense and for the current month
+        current_month = date.today().strftime("%Y-%m")
+        if r_type == "expense" and record_date.strftime("%Y-%m") == current_month:
             self.budget.add_spending(amount)
             self.storage.save_budget(self.budget)
         return record
 
     def update_record(self, record_id: int, **kwargs) -> bool:
-        """Update attributes of a record if it exists.
-
-        Accepted keyword arguments correspond to the fields on
-        :class:`Record` (amount, r_type, category, note,
-        record_date and store). Values not matching the expected
-        type may cause a runtime error; the caller is responsible
-        for validation.
-        """
         record = self.get_record(record_id)
         if not record:
             return False
@@ -159,16 +119,109 @@ class RecordController:
                 return True
         return False
 
+    def delete_category(self, category_id: int) -> bool:
+        """Remove a category from the list and persist the change."""
+        for i, cat in enumerate(self.categories):
+            if cat.category_id == category_id:
+                del self.categories[i]
+                self.storage.save_categories(self.categories)
+                return True
+        return False
+
     def get_categories(self) -> List[Category]:
         """Return a copy of the current list of categories."""
         return list(self.categories)
 
     # -- Budget operations -------------------------------------------------
     def set_budget(self, amount: float) -> None:
-        """Set a new monthly budget goal and persist it."""
-        self.budget.set_budget(amount)
+        """Set a new monthly budget goal for the current month."""
+        current_month = date.today().strftime("%Y-%m")
+        if self.budget.month != current_month:
+            # If the budget is for a different month, reset it
+            self.budget = Budget(monthly_goal=amount, month=current_month)
+        else:
+            # Update the budget for the current month
+            self.budget.set_budget(amount)
         self.storage.save_budget(self.budget)
 
+    def get_budget_status_detail(self) -> Tuple[str, str]:
+        """返回当前月份预算状态的等级和中文说明。
+
+        level 取值：
+        - "no_budget": 未设置预算
+        - "normal": 预算宽裕（<50%）
+        - "tight": 预算使用过半（50%~80%）
+        - "warning": 接近上限（80%~100%）
+        - "over": 已超出预算
+        """
+        budget = getattr(self, "budget", None)
+        if budget is None:
+            msg = (
+                "当前尚未设置本月预算。\n"
+                "你可以在「首页 → 设置 / 修改本月预算」中设置，例如 2000 元，"
+                "用于控制本月整体支出。"
+            )
+            return "no_budget", msg
+
+        limit = getattr(budget, "monthly_goal", None)
+        if not limit or limit <= 0:
+            msg = (
+                "当前预算数值无效，请重新设置一个大于 0 的本月预算。\n"
+                "例如设置为 2000 或 3000 元。"
+            )
+            return "no_budget", msg
+
+        today = date.today()
+        expenses_this_month = [
+            r for r in self.records
+            if r.r_type == "expense"
+            and hasattr(r, "record_date")
+            and isinstance(r.record_date, date)
+            and r.record_date.year == today.year
+            and r.record_date.month == today.month
+        ]
+
+        spent = sum(r.amount for r in expenses_this_month)
+        ratio = spent / limit if limit > 0 else 0.0
+        remaining = limit - spent
+
+        if ratio < 0.5:
+            level = "normal"
+            msg = (
+                f"本月预算：{limit:.2f} 元，目前已支出：{spent:.2f} 元，"
+                f"约占预算的 {ratio * 100:.1f}%。\n"
+                "整体比较宽裕，可以按计划正常消费，但仍建议预留一部分结余。"
+            )
+        elif ratio < 0.8:
+            level = "tight"
+            msg = (
+                f"本月预算：{limit:.2f} 元，目前已支出：{spent:.2f} 元，"
+                f"约占预算的 {ratio * 100:.1f}%。\n"
+                "预算使用已经过半，建议适当关注后续支出节奏，"
+                "将大额非刚需消费往后排一排。"
+            )
+        elif ratio < 1.0:
+            level = "warning"
+            msg = (
+                f"本月预算：{limit:.2f} 元，目前已支出：{spent:.2f} 元，"
+                f"约占预算的 {ratio * 100:.1f}%，剩余约 {remaining:.2f} 元。\n"
+                "已经接近本月预算上限，建议暂停不必要的消费，"
+                "避免轻易超过预算。"
+            )
+        else:
+            level = "over"
+            over_amount = spent - limit
+            msg = (
+                f"本月预算：{limit:.2f} 元，目前已支出：{spent:.2f} 元，"
+                f"已经超出预算 {over_amount:.2f} 元。\n"
+                "主人主人！！！再乱花钱月底要吃土啦！！！"
+                "建议尽快复盘本月的大额支出，暂停非刚需消费，"
+                "并在下个月重新评估一个更合理的预算。"
+            )
+
+        return level, msg
+
     def check_budget_status(self) -> str:
-        """Return a human-friendly budget status message."""
-        return self.budget.send_reminder()
+        """返回中文预算提示文本。"""
+        _, msg = self.get_budget_status_detail()
+        return msg

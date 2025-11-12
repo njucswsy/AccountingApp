@@ -1,12 +1,3 @@
-"""Controller for search-related operations.
-
-This controller is a thin wrapper around the
-:class:`SearchEngine` service. It obtains the list of records
-from the :class:`RecordController` or from an external source
-and delegates the actual filtering logic to the search engine.
-It also exposes search history to the user interface.
-"""
-
 from datetime import date
 from typing import List, Optional
 

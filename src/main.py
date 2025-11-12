@@ -1,21 +1,18 @@
-"""Entry point for the accounting application.
+from PyQt5.QtWidgets import QApplication
+import sys
+import os
 
-Running this module directly will launch the command line
-interface. This file is intentionally kept small to focus on
-initialisation and delegation to the UI class. This separation
-allows the application to be embedded in different contexts
-without modification; for example, the CLI could be replaced
-with a graphical interface simply by importing and invoking
-another UI class from here.
-"""
+# 添加父目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.ui.cli import CommandLineUI
+from src.ui.app import MoneyManagerApp
 
 
 def main() -> None:
-    """Instantiate the command line UI and begin interaction."""
-    ui = CommandLineUI()
-    ui.run()
+    app = QApplication(sys.argv)
+    window = MoneyManagerApp()
+    window.show()
+    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
