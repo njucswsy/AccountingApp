@@ -1,6 +1,10 @@
+﻿# Python cache / test artifacts
 __pycache__/
 *.pyc
-.vscode/
-.env/
-.venv/
-data/*.json
+.pytest_cache/
+.coverage
+htmlcov/
+
+# AFL++
+fuzz_afl/out/
+fuzz_afl/target
