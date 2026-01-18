@@ -61,8 +61,14 @@ class RecordController:
         for key, value in kwargs.items():
             if hasattr(record, key):
                 # Cast date strings to date objects if necessary
+                #if key == "record_date" and isinstance(value, str):
+                #    value = Record.parse_date(value)
                 if key == "record_date" and isinstance(value, str):
-                    value = Record.parse_date(value)
+                    try:
+                        value = Record.parse_date(value)
+                    except ValueError:
+                        # 非法日期字符串：不修改记录，返回失败
+                        return False
                 setattr(record, key, value)
         self.storage.save_records(self.records)
         return True
